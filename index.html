@@ -3,53 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Smart Mirror - 20 Fancy Filters</title>
+    <title>AR Mirror - Cute Fancy Filters</title>
     
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
-    <script src="https://cdn.jsdelivr.net/npm/deepar/js/deepar.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
         body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Poppins', sans-serif; }
-        #main-container { position: relative; width: 100vw; height: 100vh; }
+        #container { position: relative; width: 100vw; height: 100vh; }
         video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        canvas#deepar-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
-        #dressImg { position: absolute; z-index: 3; pointer-events: none; display: none; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.5)); }
+        #overlay-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+        #dressImg { position: absolute; z-index: 3; pointer-events: none; display: none; }
         
-        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 95%; display: flex; flex-direction: column; align-items: center; gap: 15px; z-index: 10; }
-        .filter-slider { display: flex; gap: 12px; overflow-x: auto; width: 100%; padding: 10px; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
-        .filter-slider::-webkit-scrollbar { display: none; }
+        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 95%; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .shelf { display: flex; gap: 12px; overflow-x: auto; width: 100%; padding: 10px; scroll-behavior: smooth; }
+        .shelf::-webkit-scrollbar { display: none; }
+        .item { min-width: 65px; height: 65px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 2px solid #fff; display: flex; justify-content: center; align-items: center; cursor: pointer; flex-shrink: 0; }
+        .item img { width: 70%; height: 70%; object-fit: contain; }
         
-        .f-item { min-width: 65px; height: 65px; border-radius: 50%; background: rgba(255,255,255,0.15); backdrop-filter: blur(12px); border: 2px solid rgba(255,255,255,0.4); display: flex; justify-content: center; align-items: center; color: #fff; font-size: 10px; font-weight: 600; cursor: pointer; text-align: center; flex-shrink: 0; transition: 0.2s; }
-        .f-item:active { transform: scale(0.9); background: #fff; color: #000; }
-        
-        .tab-bar { display: flex; gap: 10px; background: rgba(0,0,0,0.6); padding: 6px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); }
-        .t-btn { padding: 10px 22px; border-radius: 20px; color: #fff; font-size: 13px; border: none; background: none; cursor: pointer; transition: 0.3s; }
+        .tabs { display: flex; gap: 10px; background: rgba(0,0,0,0.6); padding: 5px; border-radius: 25px; }
+        .t-btn { padding: 8px 20px; border-radius: 20px; color: #fff; border: none; background: none; cursor: pointer; font-size: 13px; }
         .t-btn.active { background: #fff; color: #000; font-weight: 600; }
-
-        #loading { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99; color: #fff; text-align: center; padding: 20px; }
-        .loader-text { margin-top: 15px; font-size: 14px; letter-spacing: 1px; }
-        #error-log { color: #ff4d4d; font-size: 12px; margin-top: 10px; display: none; }
+        
+        #loading { position: fixed; inset: 0; background: #000; display: flex; justify-content: center; align-items: center; z-index: 99; color: #fff; }
     </style>
 </head>
 <body>
-    <div id="loading">
-        <div style="font-size: 30px;">✨</div>
-        <div class="loader-text">🪄 මැජික් එක ලෝඩ් වෙනවා...</div>
-        <div id="error-log">License Error! Please check your Domain.</div>
-    </div>
+    <div id="loading">✨ Loading Cute Filters...</div>
 
-    <div id="main-container">
+    <div id="container">
         <video id="input_video" autoplay playsinline muted></video>
-        <canvas id="deepar-canvas"></canvas>
+        <canvas id="overlay-canvas"></canvas>
         <img id="dressImg" src="" crossorigin="anonymous">
 
         <div class="controls">
-            <div id="filter-shelf" class="filter-slider"></div>
-            <div class="tab-bar">
-                <button id="btn-dress" class="t-btn active" onclick="setMode('dresses')">Dresses</button>
-                <button id="btn-filter" class="t-btn" onclick="setMode('filters')">Fancy Filters</button>
+            <div id="shelf" class="shelf"></div>
+            <div class="tabs">
+                <button id="tab-dress" class="t-btn active" onclick="setMode('dresses')">Dresses</button>
+                <button id="tab-filter" class="t-btn" onclick="setMode('filters')">Cute Filters</button>
             </div>
         </div>
     </div>
@@ -64,57 +57,32 @@
 
         const video = document.getElementById('input_video');
         const dressImg = document.getElementById('dressImg');
-        const shelf = document.getElementById('filter-shelf');
-        let mode = 'dresses';
-        let deepAR;
+        const canvas = document.getElementById('overlay-canvas');
+        const ctx = canvas.getContext('2d');
+        const shelf = document.getElementById('shelf');
 
-        // --- 20 Super Fancy Filters ---
-        const fancyFilters = [
-            { name: 'None', url: '' },
-            { name: 'Aviators', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Aviators.deepar' },
-            { name: 'Devil', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Devil_Horns.deepar' },
-            { name: 'Dalmatian', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Dalmatian.deepar' },
-            { name: 'Flowers', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Flower_Crown.deepar' },
-            { name: 'Beard', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Beard.deepar' },
-            { name: 'Beauty', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Beauty.deepar' },
-            { name: 'Lion', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Lion.deepar' },
-            { name: 'Fairy', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Fairy_Lights.deepar' },
-            { name: 'Tiger', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Tiger.deepar' },
-            { name: 'Alien', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Alien.deepar' },
-            { name: 'Kawaii', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Kawaii.deepar' },
-            { name: 'Pixel', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Pixel_Art.deepar' },
-            { name: 'Neon', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Neon_Devil.deepar' },
-            { name: 'Stickers', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Stickers.deepar' },
-            { name: 'Fire', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Fire.deepar' },
-            { name: 'Butterfly', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Butterfly.deepar' },
-            { name: 'Pumpkin', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Pumpkin.deepar' },
-            { name: 'Zombies', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Zombies.deepar' },
-            { name: 'Rain', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Rain.deepar' },
-            { name: 'Elephant', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Elephant.deepar' }
+        let mode = 'dresses';
+        let currentFilter = null;
+        const filterImgs = {};
+
+        // --- Cute Filters Assets ---
+        const cuteFilters = [
+            { id: 'none', name: 'None', icon: '🚫' },
+            { id: 'hearts', name: 'Hearts', url: 'https://i.imgur.com/vD9S6Yh.png' },
+            { id: 'cat', name: 'Cute Cat', url: 'https://i.imgur.com/6vR8SQu.png' },
+            { id: 'stars', name: 'Blush Stars', url: 'https://i.imgur.com/u5p9v8n.png' },
+            { id: 'crown', name: 'Gold Crown', url: 'https://i.imgur.com/Ynx7mGj.png' }
         ];
 
-        async function initAR() {
-            try {
-                deepAR = await deepar.initialize({
-                    licenseKey: 'Cc673e6361a62b2de5a769fb5b621aca4aea26c8484c7976b62f5b0950b47489dda89562aac97abb',
-                    canvas: document.getElementById('deepar-canvas'),
-                    videoElement: video
-                });
-                document.getElementById('loading').style.display = 'none';
-                loadShelf();
-            } catch(e) {
-                console.error(e);
-                document.getElementById('error-log').style.display = 'block';
-                document.getElementById('error-log').innerText = "Error: " + e.message;
-            }
-        }
+        // Preload Filter Images
+        cuteFilters.forEach(f => { if(f.url) { const img = new Image(); img.src = f.url; img.crossOrigin = "anonymous"; filterImgs[f.id] = img; } });
 
         window.setMode = (m) => {
             mode = m;
-            document.getElementById('btn-dress').classList.toggle('active', m === 'dresses');
-            document.getElementById('btn-filter').classList.toggle('active', m === 'filters');
+            document.getElementById('tab-dress').classList.toggle('active', m === 'dresses');
+            document.getElementById('tab-filter').classList.toggle('active', m === 'filters');
             if(m === 'filters') dressImg.style.display = 'none';
-            if(m === 'dresses') deepAR.switchEffect('');
+            else currentFilter = null;
             loadShelf();
         };
 
@@ -122,29 +90,61 @@
             shelf.innerHTML = '';
             if(mode === 'dresses') {
                 onValue(ref(db, 'dresses'), (snap) => {
-                    shelf.innerHTML = '<div class="f-item" onclick="clearAll()">🚫</div>';
+                    shelf.innerHTML = '<div class="item" onclick="clearAll()">🚫</div>';
                     snap.forEach(c => {
                         const d = c.val();
-                        const item = document.createElement('div');
-                        item.className = 'f-item';
-                        item.innerHTML = `<img src="${d.url}" style="width:70%" crossorigin="anonymous">`;
-                        item.onclick = () => { dressImg.src = d.url; dressImg.style.display = 'block'; };
-                        shelf.appendChild(item);
+                        const div = document.createElement('div'); div.className = 'item';
+                        div.innerHTML = `<img src="${d.url}" crossorigin="anonymous">`;
+                        div.onclick = () => { dressImg.src = d.url; dressImg.style.display = 'block'; };
+                        shelf.appendChild(div);
                     });
                 });
             } else {
-                fancyFilters.forEach(f => {
-                    const item = document.createElement('div');
-                    item.className = 'f-item';
-                    item.innerText = f.name;
-                    item.onclick = () => deepAR.switchEffect(f.url);
-                    shelf.appendChild(item);
+                cuteFilters.forEach(f => {
+                    const div = document.createElement('div'); div.className = 'item';
+                    div.innerHTML = f.icon || `<img src="${f.url}" crossorigin="anonymous">`;
+                    div.onclick = () => currentFilter = (f.id === 'none') ? null : f.id;
+                    shelf.appendChild(div);
                 });
             }
         }
 
-        window.clearAll = () => { dressImg.style.display = 'none'; deepAR.switchEffect(''); };
+        window.clearAll = () => { dressImg.style.display = 'none'; currentFilter = null; ctx.clearRect(0, 0, canvas.width, canvas.height); };
 
+        // --- Face Mesh (For Cute Filters) ---
+        const faceMesh = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
+        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5 });
+        faceMesh.onResults(res => {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if(!res.multiFaceLandmarks || !currentFilter) return;
+
+            const landmarks = res.multiFaceLandmarks[0];
+            const img = filterImgs[currentFilter];
+            if(!img) return;
+
+            // පාවිච්චි කරන්නාගේ මූණේ ලක්ෂ්‍ය අනුව Filter එක තැබීම
+            const topHead = landmarks[10]; // නළල මුදුන
+            const chin = landmarks[152]; // නිකට
+            const leftCheek = landmarks[234];
+            const rightCheek = landmarks[454];
+
+            const width = Math.abs(rightCheek.x - leftCheek.x) * canvas.width * 2.5;
+            const height = width * (img.height / img.width);
+            const x = topHead.x * canvas.width;
+            const y = topHead.y * canvas.height;
+
+            ctx.save();
+            ctx.translate(x, y);
+            // මූණ ඇල කරන පැත්තට Filter එකත් ඇල කිරීම
+            const angle = Math.atan2(rightCheek.y - leftCheek.y, rightCheek.x - leftCheek.x);
+            ctx.rotate(angle);
+            ctx.scale(-1, 1); // Mirror Effect
+            ctx.drawImage(img, -width/2, -height/0.8, width, height);
+            ctx.restore();
+        });
+
+        // --- Pose Tracking (For Dresses) ---
         const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
         pose.setOptions({ modelComplexity: 0 });
         pose.onResults(res => {
@@ -157,9 +157,13 @@
             dressImg.style.width = `${w}px`; dressImg.style.transform = `translate(-50%, -15%) scaleX(-1)`;
         });
 
-        const cam = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 1280, height: 720 });
-        cam.start();
-        initAR();
+        const cam = new Camera(video, { onFrame: async () => { 
+            await faceMesh.send({image: video});
+            await pose.send({image: video});
+        }, width: 1280, height: 720 });
+        
+        cam.start().then(() => { document.getElementById('loading').style.display = 'none'; loadShelf(); });
     </script>
 </body>
 </html>
+
