@@ -59,7 +59,6 @@
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.onkeydown = function(e) { if(e.keyCode==123 || (e.ctrlKey&&e.shiftKey&&e.keyCode==73) || (e.ctrlKey&&e.keyCode==85)) return false; };
         
-        // ඔයාගේ ආරක්ෂිත Cloudflare ලින්ක් එක
         const CF_WORKER_URL = 'https://ar-mirror.tharu10r.workers.dev';
         const vEl = document.getElementById('input_video');
         
@@ -181,12 +180,26 @@
                 window.applyFilter('none'); 
                 
                 const toast = document.getElementById('toast');
-                toast.style.opacity = '1'; 
-                setTimeout(() => toast.style.opacity = '0', 3500);
-
                 const sinToast = document.getElementById('sinhala-toast');
+
+                // 1. මුලින්ම සිංහල පණිවිඩය පෙන්නනවා
                 sinToast.style.opacity = '1';
-                setTimeout(() => sinToast.style.opacity = '0', 15000);
+                toast.style.opacity = '0'; // ඉංග්‍රීසි එක හැංගුවා
+                
+                // 2. තත්පර 10කින් සිංහල එක මකලා ඉංග්‍රීසි එක දානවා
+                setTimeout(() => {
+                    sinToast.style.opacity = '0';
+                    
+                    // තත්පර බාගයක පොඩි පරතරයක් (Fade out වෙන්න)
+                    setTimeout(() => {
+                        toast.style.opacity = '1';
+                        
+                        // තවත් තත්පර 4කින් ඉංග්‍රීසි එකත් මැකිලා යනවා
+                        setTimeout(() => {
+                            toast.style.opacity = '0';
+                        }, 4000);
+                    }, 500);
+                }, 10000);
             }
         };
 
