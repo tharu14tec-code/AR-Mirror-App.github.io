@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Smart Mirror - Easy Filter</title>
+    <title>AR Smart Mirror - 20 Fancy Filters</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
@@ -17,23 +17,28 @@
         canvas#deepar-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
         #dressImg { position: absolute; z-index: 3; pointer-events: none; display: none; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.5)); }
         
-        /* පහළින් තියෙන Control Panel එක */
-        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; display: flex; flex-direction: column; align-items: center; gap: 15px; z-index: 10; }
-        
-        .filter-slider { display: flex; gap: 10px; overflow-x: auto; width: 100%; padding: 10px; scroll-behavior: smooth; }
+        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 95%; display: flex; flex-direction: column; align-items: center; gap: 15px; z-index: 10; }
+        .filter-slider { display: flex; gap: 12px; overflow-x: auto; width: 100%; padding: 10px; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
         .filter-slider::-webkit-scrollbar { display: none; }
         
-        .f-item { min-width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 2px solid #fff; display: flex; justify-content: center; align-items: center; color: #fff; font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; }
+        .f-item { min-width: 65px; height: 65px; border-radius: 50%; background: rgba(255,255,255,0.15); backdrop-filter: blur(12px); border: 2px solid rgba(255,255,255,0.4); display: flex; justify-content: center; align-items: center; color: #fff; font-size: 10px; font-weight: 600; cursor: pointer; text-align: center; flex-shrink: 0; transition: 0.2s; }
+        .f-item:active { transform: scale(0.9); background: #fff; color: #000; }
         
-        .tab-bar { display: flex; gap: 10px; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); }
-        .t-btn { padding: 8px 20px; border-radius: 20px; color: #fff; font-size: 13px; border: none; background: none; cursor: pointer; }
+        .tab-bar { display: flex; gap: 10px; background: rgba(0,0,0,0.6); padding: 6px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); }
+        .t-btn { padding: 10px 22px; border-radius: 20px; color: #fff; font-size: 13px; border: none; background: none; cursor: pointer; transition: 0.3s; }
         .t-btn.active { background: #fff; color: #000; font-weight: 600; }
 
-        #loading { position: fixed; inset: 0; background: #000; display: flex; justify-content: center; align-items: center; z-index: 99; color: #fff; }
+        #loading { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99; color: #fff; text-align: center; padding: 20px; }
+        .loader-text { margin-top: 15px; font-size: 14px; letter-spacing: 1px; }
+        #error-log { color: #ff4d4d; font-size: 12px; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
-    <div id="loading">✨ Magic is loading...</div>
+    <div id="loading">
+        <div style="font-size: 30px;">✨</div>
+        <div class="loader-text">🪄 මැජික් එක ලෝඩ් වෙනවා...</div>
+        <div id="error-log">License Error! Please check your Domain.</div>
+    </div>
 
     <div id="main-container">
         <video id="input_video" autoplay playsinline muted></video>
@@ -42,10 +47,9 @@
 
         <div class="controls">
             <div id="filter-shelf" class="filter-slider"></div>
-            
             <div class="tab-bar">
                 <button id="btn-dress" class="t-btn active" onclick="setMode('dresses')">Dresses</button>
-                <button id="btn-filter" class="t-btn" onclick="setMode('filters')">3D Filters</button>
+                <button id="btn-filter" class="t-btn" onclick="setMode('filters')">Fancy Filters</button>
             </div>
         </div>
     </div>
@@ -64,26 +68,45 @@
         let mode = 'dresses';
         let deepAR;
 
-        // --- DeepAR ලේසිම Filters ලින්ක් ටික ---
-        const quickFilters = [
+        // --- 20 Super Fancy Filters ---
+        const fancyFilters = [
             { name: 'None', url: '' },
-            { name: 'Sunglasses', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Aviators.deepar' },
+            { name: 'Aviators', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Aviators.deepar' },
             { name: 'Devil', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Devil_Horns.deepar' },
-            { name: 'Dog', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Dalmatian.deepar' },
-            { name: 'Flower', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Flower_Crown.deepar' },
+            { name: 'Dalmatian', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Dalmatian.deepar' },
+            { name: 'Flowers', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Flower_Crown.deepar' },
             { name: 'Beard', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Beard.deepar' },
+            { name: 'Beauty', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Beauty.deepar' },
             { name: 'Lion', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Lion.deepar' },
-            { name: 'Makeup', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Beauty.deepar' }
+            { name: 'Fairy', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Fairy_Lights.deepar' },
+            { name: 'Tiger', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Tiger.deepar' },
+            { name: 'Alien', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Alien.deepar' },
+            { name: 'Kawaii', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Kawaii.deepar' },
+            { name: 'Pixel', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Pixel_Art.deepar' },
+            { name: 'Neon', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Neon_Devil.deepar' },
+            { name: 'Stickers', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Stickers.deepar' },
+            { name: 'Fire', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Fire.deepar' },
+            { name: 'Butterfly', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Butterfly.deepar' },
+            { name: 'Pumpkin', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Pumpkin.deepar' },
+            { name: 'Zombies', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Zombies.deepar' },
+            { name: 'Rain', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Rain.deepar' },
+            { name: 'Elephant', url: 'https://cdn.jsdelivr.net/npm/deepar/effects/Elephant.deepar' }
         ];
 
         async function initAR() {
-            deepAR = await deepar.initialize({
-                licenseKey: 'Cc673e6361a62b2de5a769fb5b621aca4aea26c8484c7976b62f5b0950b47489dda89562aac97abb',
-                canvas: document.getElementById('deepar-canvas'),
-                videoElement: video
-            });
-            document.getElementById('loading').style.display = 'none';
-            loadShelf();
+            try {
+                deepAR = await deepar.initialize({
+                    licenseKey: 'Cc673e6361a62b2de5a769fb5b621aca4aea26c8484c7976b62f5b0950b47489dda89562aac97abb',
+                    canvas: document.getElementById('deepar-canvas'),
+                    videoElement: video
+                });
+                document.getElementById('loading').style.display = 'none';
+                loadShelf();
+            } catch(e) {
+                console.error(e);
+                document.getElementById('error-log').style.display = 'block';
+                document.getElementById('error-log').innerText = "Error: " + e.message;
+            }
         }
 
         window.setMode = (m) => {
@@ -110,7 +133,7 @@
                     });
                 });
             } else {
-                quickFilters.forEach(f => {
+                fancyFilters.forEach(f => {
                     const item = document.createElement('div');
                     item.className = 'f-item';
                     item.innerText = f.name;
@@ -122,7 +145,6 @@
 
         window.clearAll = () => { dressImg.style.display = 'none'; deepAR.switchEffect(''); };
 
-        // Pose Tracking
         const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
         pose.setOptions({ modelComplexity: 0 });
         pose.onResults(res => {
@@ -141,4 +163,3 @@
     </script>
 </body>
 </html>
-
